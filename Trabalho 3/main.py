@@ -3,7 +3,7 @@
 # Trabalho 3 - Bloom
 # Autor: Breno Moura de Abreu
 # RA: 1561286
-# Data: 2022-04-09
+# Data: 2022-04-10
 #===============================================================================
 
 import cv2
@@ -14,16 +14,19 @@ import numpy as np
 # Constantes usadas nos algoritmos
 
 # Caminho da imagem que será carregada
-IMG_NAME = "img7.jpg"
+IMG_NAME = "img.jpg"
 
 # Threshold para o bright-pass
-THRESHOLD = 0.7
+THRESHOLD = 0.9
 
 # Quantidade de imagens borradas que serão somadas no box blur
 BOX_BLUR_N_SUMS = 4
 
-# Dimensões do kernel do box blur
-BOX_BLUR_KERNEL = (15, 15)
+# Dimensão do kernel do box blur, é o vlaor do comprimento e da altura da janela
+BOX_BLUR_KERNEL_DIM = 15
+
+# Valor que será somado às dimensões do kernel, para aumentá-lo
+BOX_BLUR_KERNEL_ADD = 24
 
 # Quantidade de vezes que a mesma imagem será borrada no box blur
 # Usado para achar a aproximação do gaussian blur com o box blur
@@ -33,7 +36,7 @@ BOX_BLUR_N_BLURS = 5
 GAUSS_BLUR_N_SUMS = 4
 
 # Valor do alfa do gaussian blur
-GAUSS_BLUR_ALPHA = 10
+GAUSS_BLUR_SIGMA = 10
 
 # Coeficiente que será multiplicado pela imagem original ao mesclá-lo com a máscara
 ORIGINAL_IMG_COEF = 0.8
@@ -75,7 +78,7 @@ def get_mask(img, threshold):
 
     return mask
 
-def box_blur(mask, n_sums, kernel, n_blurs):
+def box_blur(mask, n_sums, kernel_dim, n_blurs):
     ''' Aplica o box blur na máscara '''
 
     # Encontra as dimensões da máscara
@@ -92,18 +95,22 @@ def box_blur(mask, n_sums, kernel, n_blurs):
 
             # Para tentar criar uma aproximação com o gaussian blur,
             # Borra a mesma imagem n_blurs vezes
-            buffer = cv2.blur(buffer, kernel)
+            buffer = cv2.blur(buffer, (kernel_dim, kernel_dim))
 
         # Soma todas as imagens borradas criadas
-        # Cada imagem nova terá uma janela maior que a janela utilizada
-        # na imagem anterior
         blurred_mask += buffer
-    
+
+        # Reseta o buffer
+        buffer = mask
+
+        # Aumenta o tamanho do kernel
+        kernel_dim += BOX_BLUR_KERNEL_ADD
+
     cv2.imwrite('Mask-BoxBlur.png', blurred_mask * 255)
     
     return blurred_mask
 
-def gauss_blur(mask, n_sums, alpha):
+def gauss_blur(mask, n_sums, sigma):
     ''' Aplica o gaussian blur na máscara '''
     
     # Encontra as dimensões da máscara
@@ -114,10 +121,10 @@ def gauss_blur(mask, n_sums, alpha):
     
     # Cria n_sums imagens borradas e soma seus valores
     for i in range(n_sums):
-        blurred_mask += cv2.GaussianBlur(mask, (-1, -1), alpha)
+        blurred_mask += cv2.GaussianBlur(mask, (-1, -1), sigma)
 
-        # Atualiza o valor de alpha para aumentar o tamanho da janela
-        alpha *= 2
+        # Atualiza o valor de sigma para aumentar o tamanho da janela
+        sigma *= 2
     
     cv2.imwrite('Mask-GaussBlur.png', blurred_mask * 255)
 
@@ -143,11 +150,11 @@ def main():
     mask = get_mask(img, THRESHOLD)
 
     # Aplica o box blur à máscara e o mescla com a imagem original
-    blurred_mask = box_blur(mask, BOX_BLUR_N_SUMS, BOX_BLUR_KERNEL, BOX_BLUR_N_BLURS)
+    blurred_mask = box_blur(mask, BOX_BLUR_N_SUMS, BOX_BLUR_KERNEL_DIM, BOX_BLUR_N_BLURS)
     merge(img, ORIGINAL_IMG_COEF, blurred_mask, MASK_COEF, "Merged-BoxBlur.png")
 
     # Aplica o gaussian blur à máscara e o mescla com a imagem original
-    blurred_mask = gauss_blur(mask, GAUSS_BLUR_N_SUMS, GAUSS_BLUR_ALPHA)
+    blurred_mask = gauss_blur(mask, GAUSS_BLUR_N_SUMS, GAUSS_BLUR_SIGMA)
     merge(img, ORIGINAL_IMG_COEF, blurred_mask, MASK_COEF, "Merged-GaussBlur.png")
 
 if __name__ == "__main__":
